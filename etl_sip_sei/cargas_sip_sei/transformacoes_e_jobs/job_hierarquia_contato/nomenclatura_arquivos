@@ -1,0 +1,140 @@
+- Nomenclatura de arquivos do job para carga de hierarquia / instruções adicionais - 
+
+
+1) passo_01_[sip]_monta_rel_hierarquia_unidade_sub_suporte; ok
+2) passo_02_[sip]_migra_dados_para_rel_hierarquia;  ok
+------------------------------------------------------------
+3) passo_03_[sei]_consolida_dados_tipo_contato_suporte; -> passo_03_[sei]_consolida_dados_tipo_contato_suporte_pt02 ok
+
+Query para coletar último valor inserido em seq_contato incrementando +1 para
+corresponder ao próximo valor:
+
+select id +1 
+as id_ultimo_tipo_cont_mais_1 
+from seq_tipo_contato 
+order by id 
+desc limit 0, 1;
+
+Coletar a sigla do órgão das unidades hierarquizadas através da consulta:
+
+SELECT uni.id_unidade, 
+	   uni.id_orgao,
+	   org.sigla,
+	   uni.sigla, 
+	   uni.descricao,
+   rel_hie.id_unidade,
+	   org.id_orgao
+  FROM unidade uni
+  JOIN rel_hierarquia_unidade rel_hie ON uni.id_unidade = rel_hie.id_unidade 
+  JOIN orgao org ON uni.id_orgao = org.id_orgao where org.sigla = 'SSP' 
+  order by uni.id_unidade desc limit 0, 1;
+
+-------------------------------
+assim fica muito melhor.. consegui implementar uma forma de concatenar 
+junto com a string 'Unidades'.. pra ficar tipo 'Unidades SSP':
+
+SELECT uni.id_unidade, 
+       uni.id_orgao, CONCAT(' ', 'Unidades', ' ', org.sigla) as sigla_orgao, 
+       uni.sigla as sigla_unidade, 
+       uni.descricao, 
+       rel_hie.id_unidade, 
+       org.id_orgao FROM unidade uni JOIN rel_hierarquia_unidade rel_hie ON uni.id_unidade = rel_hie.id_unidade 
+       JOIN orgao org ON uni.id_orgao = org.id_orgao where org.sigla = 'SSP' order by uni.id_unidade desc limit 0, 1;
+
+
+
+
+
+
+
+
+4) passo_04_[sei]_migra_dados_para_tipo_contato; 				ok
+5) passo_05_[sei]_atualiza_seq_tipo_contato; 					ok
+6) passo_06_[sei]_consolida_dados_infra_parametro_suporte;
+7) passo_06_[sei]_consolida_dados_infra_parametro_suporte_pt02;
+8) passo_07_[sei]_migra_dados_para_infra_parametro; 	[aguardando..]
+9) passo_08_[sei]_consolida_dados_contato_suporte; OK [primeira parte apenas customiza auto_increment da tabela de suporte.]
+
+para coletar nome_aux, idx_contato_aux e sigla_aux vamos ter que fazer a seguinte consulta:
+
+SELECT uni.id_unidade, 
+uni.id_orgao as id_orgao_uni, 
+uni.sigla as sigla_uni_nome_aux, 
+uni.descricao as desc_nome_aux,
+(lower(concat(uni.sigla, ' ', uni.descricao))) as idx_contato_aux,  -> depois faz um update pra tirar a '/'..
+rel_hie.id_unidade, 
+rel_hie.id_hierarquia_pai as id_hie_pai, 
+rel_hie.id_unidade_pai as id_uni_pai,  
+org.id_orgao FROM unidade uni 
+JOIN rel_hierarquia_unidade rel_hie ON uni.id_unidade = rel_hie.id_unidade 
+JOIN orgao org ON uni.id_orgao = org.id_orgao 
+WHERE rel_hie.id_hierarquia_pai 
+AND rel_hie.id_unidade_pai IS NOT NULL AND uni.id_orgao <> 0
+ 
+
+
+10) passo_08_[sei]_consolida_dados_contato_suporte_pt02;
+11) passo_08_[sei]_consolida_dados_contato_suporte_pt03;
+fazer update para remover / de idx_contato_aux =====>> update contato_suporte set idx_contato_aux = replace(idx_contato_aux, "/", ""); 
+12) passo_09_[sei]_migra_dados_para_contato; 			[aguardando..]
+13) passo_10_[sei]_consolida_dados_unidade_suporte;
+14) passo_11_[sei]_migra_dados_para_unidade;
+
+
+
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_raiz_pt01.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_raiz_pt02.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_raiz_pt03.ktr
+
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_sub_pt04.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_sub_pt05.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_unidades_sub_pt06.ktr
+
+
+
+passo_08_[sei]_consolida_dados_contato_suporte.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_pt02.ktr
+passo_08_[sei]_consolida_dados_contato_suporte_pt03.ktr
+
+
+
+uma vez que a estrutura do etl foi modificada para atender a necessidade
+de hierarquizar as unidades raiz, agora temos que modificar os joins...
+
+
+para as unidades raiz:
+
+SELECT uni.id_unidade,
+uni.id_orgao as id_orgao_uni,
+uni.sigla as sigla_uni_nome_aux,
+uni.descricao as desc_nome_aux,
+(lower(concat(uni.sigla, ' ', uni.descricao))) as idx_contato_aux, 
+rel_hie.id_unidade_aux,
+rel_hie.id_hierarquia_pai_aux as id_hie_pai,
+rel_hie.id_unidade_pai_aux as id_uni_pai,
+org.id_orgao FROM sip.unidade uni
+JOIN teste_sip.rel_hierarquia_unidade_raiz_suporte rel_hie ON uni.id_unidade = rel_hie.id_unidade_aux
+JOIN sip.orgao org ON uni.id_orgao = org.id_orgao
+
+
+para as sub-unidades:
+
+SELECT uni.id_unidade,
+uni.id_orgao as id_orgao_uni,
+uni.sigla as sigla_uni_nome_aux,
+uni.descricao as desc_nome_aux,
+(lower(concat(uni.sigla, ' ', uni.descricao))) as idx_contato_aux, 
+rel_hie.id_unidade_aux,
+rel_hie.id_hierarquia_pai_aux as id_hie_pai,
+rel_hie.id_unidade_pai_aux as id_uni_pai,
+org.id_orgao FROM sip.unidade uni
+JOIN teste_sip.rel_hierarquia_unidade_sub_suporte rel_hie ON uni.id_unidade = rel_hie.id_unidade_aux
+JOIN sip.orgao org ON uni.id_orgao = org.id_orgao
+WHERE rel_hie.id_hierarquia_pai_aux
+AND rel_hie.id_unidade_pai_aux IS NOT NULL AND uni.id_orgao <> 0
+
+
+e tem que fazer um rtrim, ltrim em tipo_contato_suporte 
+antes de migrar para tabela definitiva:
+
+update `tipo_contato_suporte` set nome_aux = ltrim(rtrim(nome_aux)), descricao_aux = ltrim(rtrim(descricao_aux))

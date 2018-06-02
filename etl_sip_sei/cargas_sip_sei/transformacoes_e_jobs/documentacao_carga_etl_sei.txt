@@ -1,0 +1,531 @@
+- DOCUMENTAÇÃO CARGAS ETL SEI/SIP - 
+
+
+Este artefato de software possui como principal objetivo automatizar 
+a carga de dados no banco de dados SIP (unidades, usuários e hierarquização 
+de unidades), SEI (unidades, contatos e parametrizações atreladas).
+
+
+O processo anterior era executado através da ferramenta iMacros 
+(https://addons.mozilla.org/pt-BR/firefox/addon/imacros-for-firefox/); este 
+por sua vez consiste em um add-on para o browser firefox que automatiza o 
+processo de carregamento de dados, extraindo estes de planilhas em formato 
+.csv e redirecionando para o browser, por meio de parametrizações intrínsecas
+à própria ferramenta (pseudo-scripts).
+
+
+Pentaho é um software de código aberto para inteligência empresarial, desenvolvido 
+em Java. A solução cobre as àreas de ETL (Extraction, Transformation and Load), 
+reporting, OLAP e mineração de dados (data-mining). Desenvolvido desde 2004 pela 
+Pentaho Corporation o software foi considerado uma das melhores aplicações para 
+inteligência empresarial em 2008 pela InfoWorld (fonte: Wikipedia).
+
+
+1. ESTRUTURA DA CARGA 
+
+
+A estrutura deste ETL consiste em um job que por sua vez, possui em sua estrutura
+2 transformações e 3 jobs, cada um responsável por executar ações de extração, transformação 
+e carregamento de dados para o banco de dados, visando sempre manter a integridade do mesmo após 
+a carga pois, durante o desenvolvimento da carga, uma engenharia reversa na estrutura
+do banco de dados foi realizada, afim de compreender com máxima clareza como a camada de
+controle da aplicação executa o carregamento dos dados.
+
+
+
+Legendas:
+
+ktr. -> Transformação
+kjb. -> Job
+stp. -> Step
+
+
+
+1.1. ktr. 'carrega_unidades'
+
+
+Este job, possui como finalidade, dentro do contexto da carga, carregar dados referentes 
+às unidades SIP. O job possui as seguintes transformações em sua estrutura:
+
+
+stp. Microsoft Excel Input:
+
+Este elemento possui como finalidade, carregar os dados oriundos de planilhas 
+pré-parametrizadas para dentro do contexto do Pentaho. É uma das transformações 
+em que o usuário deverá interagir durante o procedimento de carga para apontar para 
+a fonte de dados de interesse.
+
+stp. Database join - incrementa e retorna sequencia:
+
+
+Esta transformação coleta o valor atual da tabela de sequência (infra_sequencia/unidade),
+o incrementa e o retorna, fazendo com que o valor de 'id_unidade' da tabela 'sip.unidade'
+esteja sempre íntegro e de acordo com a quantidade de registros inseridos. Falhas na 
+atualização da tabela 'infra_sequencia' em procedimentos ETL acarretam em instabilidade 
+do sistema, no que tange a inserção de novas unidades.
+
+
+stp. Database join - coleta id_orgao dinamicamente pela planilha:
+
+
+Ao carregar unidades na tabela 'sip.unidade', deve-se coletar também a identificação 
+única do órgão pré-cadastrado; tal identificação única no escopo da tabela em questão 
+é feita através da coluna 'id_orgao'. Esta transformação possui como finalidade, coletar 
+o valor de 'id_orgao', e inserir o mesmo dentro do escopo da carga. 
+
+
+stp. Add constants:
+
+
+Esta transformação, basicamente facilita o processo de atribuição de valores constantes 
+dentro do escopo da carga; a tabela 'sip.unidade' possui valores constantes em sua 
+estrutura ('sin_ativo',  'sin_global' e 'id_origem'). Estes valores posteriormente serão
+coletados na próxima transformação.
+
+stp. Table output:
+
+
+Esta transformação possui como objetivo consolidar, parametrizar e carregar os dados das 
+transformações anteriores para a tabela alvo, neste caso 'sip.unidade'. Basicamente, 
+os campos de origem são parametrizados para os campos de destino, e por fim os dados
+são carregados. Após a execução deste job, já é possível visualizar as unidades recém 
+carregadas dentro do SIP (Unidades > Listar).
+
+
+
+------------------------------------------------------------------------------
+
+
+1.2. ktr. 'carrega_usuarios'
+
+
+Este job, possui como finalidade, dentro do contexto da carga, carregar dados 
+referentes aos usuários SIP. O job possui as seguintes transformações em sua 
+estrutura:
+
+
+stp. Microsoft Excel Input:
+
+Este elemento possui como finalidade, carregar os dados oriundos de planilhas 
+pré-parametrizadas para dentro do contexto do Pentaho. É uma das transformações 
+em que o usuário deverá interagir durante o procedimento de carga para apontar para 
+a fonte de dados de interesse.
+
+
+stp. Replace in string:
+
+Esta transformação possui como finalidade, executar formatações no padrão de matrícula
+de usuários. A concatenação do nome do usuário com a matrícula deverá ter como resultado
+final:
+
+NOME DO USUÁRIO - Matr.0000000-0
+
+
+stp. Modified Java Script Value:
+
+
+Esta transformação desempenha papel similar ao Replace in string; variáveis são definidas
+e operações são realizadas para garantir a formatação do padrão de usuários SIP.
+
+
+stp. Database join - incrementa e retorna a sequencia:
+
+
+Esta transformação coleta o valor atual da tabela de sequência (infra_sequencia/usuario),
+o incrementa e o retorna, fazendo com que o valor de 'id_usuario' da tabela 'sip.usuario'
+esteja sempre íntegro e de acordo com a quantidade de registros inseridos. Falhas na 
+atualização da tabela 'infra_sequencia' em procedimentos ETL acarretam em instabilidade 
+do sistema, no que tange a inserção de novos usuários.
+
+
+stp. Database join - coleta id_orgao dinamicamente pela planilha:
+
+Ao carregar usuários na tabela 'sip.usuario', deve-se coletar também a identificação 
+única do órgão pré-cadastrado; tal identificação única no escopo da tabela em questão 
+é feita através da coluna 'id_orgao'. Esta transformação possui como finalidade, coletar 
+o valor de 'id_orgao', e inserir o mesmo dentro do escopo da carga. 
+
+
+stp. Add constants: 
+
+Esta transformação, basicamente facilita o processo de atribuição de valores constantes 
+dentro do escopo da carga; a tabela 'sip.usuario' possui valores constantes em sua 
+estrutura ('sin_ativo' e 'id_origem'). Estes valores posteriormente serão
+coletados na próxima transformação.
+
+stp. Table output:
+
+
+Esta transformação possui como objetivo consolidar, parametrizar e carregar os dados das 
+transformações anteriores para a tabela alvo, neste caso 'sip.usuario'. Basicamente, 
+os campos de origem são parametrizados para os campos de destino, e por fim os dados
+são carregados. Após a execução deste job, já é possível visualizar os usuários recém 
+carregados dentro do SIP (Usuários > Listar).
+
+
+------------------------------------------------------------------------------
+
+
+1.3. kjb. 'carrega_contatos'
+
+
+O Job 'carrega_contatos' possui como objetivo carregar dados referentes à hierarquização
+de unidades no SIP (tal ação por padrão dentro do sistema, irá coincidir em replicação 
+de dados a partir do SIP via comunicação web service (SIP -> SEI[PHP-SOAP])). Toda vez 
+que uma unidade é hierarquizada dentro do SIP, os dados são imediatamente replicados 
+para o banco de dados do SEI e implicitamente, diversas entidades são alimentadas.
+
+Fluxo de inserção: 
+
+- montar hierarquia de unidades raiz;
+- montar hierarquia de sub-unidades;
+- criar sei.tipo_contato (padrão: 'Unidades ORGAO_XPTO' - sei.tipo_contato);
+- atualizar 'sei.seq_tipo_contato' com último valor de 'tipo_contato';
+- criar infra_parametro (padrão: 'ORGAO_ID_TIPO_CONTATO_UNIDADES');
+- inserir dados resultantes de hierarquização de unidades raiz em 'sei.contato';
+- inserir dados resultantes de hierarquização de sub-unidades em 'sei.contato';
+- inserir dados resultantes de hierarquização de unidades raiz em 'sei.unidade';
+- inserir dados resultantes de hierarquização de sub-unidades em 'sei.unidade'; 
+- inserir dados de e-mail de unidades raiz;
+- inserir dados de e-mail de sub-unidades raiz; 
+- carregar nova entrada para a tabela associativa 'sei.rel_unidade_tipo_contato';
+
+
+
+1.3.1. ktr. 'monta hierarq. raiz':
+
+Esta transformação possui como objetivo inserir dados correspondentes a hierarquização 
+de unidades raiz presentes dentro da tabela Excel fornecida pelo órgão interessado.  
+
+
+stp. Microsoft Excel Input:
+
+Ao carregar dados de hierarquização pré-fornecidos pelo órgão interessado, deve-se primeiro
+carregar a planilha fornecida com os dados. Tais dados servirão como argumentos para inserção
+em 'sip.rel_hierarquia_unidade'.
+
+
+stp. Database join:
+
+Este step em particular irá utilizar os dados da planilha como argumento para 
+pesquisar valores de 'id_unidade' referentes às unidades hierarquizadas. Posteriormente,
+com estes valores carregados para o contexto da transformação e então, utilizados 
+no próximo step.
+
+
+stp. Execute SQL script:
+
+Finalmente, este é o step que irá consolidar e inserir todos os dados na tabela alvo, neste 
+caso 'sip.rel_hierarquia_unidade'. Tal tarefa é executada com valores previamente observados
+durante o processo de engenharia reversa e que são padrão para cada inserção neste objeto.
+
+
+1.3.2. ktr. 'monta hierarq. sub':
+
+
+stp. Microsoft Excel Input:
+
+Ao carregar dados de hierarquização pré-fornecidos pelo órgão interessado, deve-se primeiro
+carregar a planilha fornecida com os dados. Tais dados servirão como argumentos para inserção
+em 'sip.rel_hierarquia_unidade'.
+
+
+stp. Database join:
+
+Este step em particular irá utilizar os dados da planilha como argumento para 
+pesquisar valores de 'id_unidade' referentes às unidades hierarquizadas (sub-unidades). 
+Posteriormente,com estes valores carregados para o contexto da transformação e então, 
+utilizados no próximo step.
+
+
+stp. Database join 2:
+
+Este step em particular irá utilizar os dados da planilha como argumento para 
+pesquisar valores de 'id_unidade' referentes às unidades hierarquizadas (unidades raiz). 
+Posteriormente,com estes valores carregados para o contexto da transformação e então, 
+utilizados no próximo step.
+
+
+stp. Execute SQL script:
+
+Finalmente, este é o step que irá consolidar e inserir todos os dados na tabela alvo, neste 
+caso 'sip.rel_hierarquia_unidade'. Tal tarefa é executada com valores previamente observados
+durante o processo de engenharia reversa e que são padrão para cada inserção neste objeto.
+
+
+
+1.3.3. ktr. 'cria tipo_contato':
+
+Esta transformação irá criar uma nova entrada na tabela 'sei.tipo_contato'. Tal tabela necessita
+ser atualizada pois a mesma possui diversos relacionamentos dentro da estrutura do banco e a 
+não atualização pode obviamente acarretar em sérios problemas de integridade e instabilidade da
+aplicação como um todo. 
+
+
+stp. Table input:
+
+Este step executa uma consulta no banco de dados do SIP para recuperar valores referentes 
+às 'últimas unidades hierarquizadas' dentro em um 'time gap' pré-estabelecido, utilizando 
+como argumento de pesquisa em cláusula WHERE. Tais artifícios de pesquisa foram implementados
+para garantir que a informação retornada seja sempre a correta e que inconsistências não sejam
+geradas dentro do banco. Sendo assim, quando um grupo de unidades é hierarquizado, a coluna 
+'dta_inicio' de 'sip.rel_hierarquia_unidade', guardará o 'timestamp' da inserção; este 'timestamp' 
+será utilizado para garantir que a inserção em 'sei.tipo_contato' seja referente ao tipo de contato
+do contexto da carga, ou seja 'Unidades ORGAO_CARGA_ATUAL'.
+
+
+stp. Table input 2:
+
+Este step simplesmente coleta o valor de 'id' referente ao último registro inserido na tabela
+de sequência 'seq_tipo_contato'; tal procedimento se faz necessário pois caso a sequência não 
+for respeitada, problemas de integridade no banco de dados e, consequentemente, na aplicação 
+aparecerão pois a mesma estará esperando o último valor conhecido por ela e também, por sua 
+estrutura de cache.
+
+
+stp. Join Rows (cartesian product):
+
+O papel do step join rows neste contexto é de simplesmente 'juntar' os resultados dos inputs 
+anteriores, para que posteriomente tais valores possam ser utilizados dentro da estrutura do 
+'Execute SQL script' no recurso de 'variable substitution' ou substituição de variáveis.
+
+
+stp. Execute SQL script:
+
+Neste step é que a inserção é feita; os valores parametrizados anteriormente e redirecionados para 
+o contexto da transformação, são reconhecidos em 'variable substitution' e então inseridos na 
+tabela alvo que neste caso é 'tipo_contato'.
+
+
+1.3.4. ktr. 'atualiza seq_tipo_contato':
+
+Esta transformação possui como intuito, executar a atualização da sequência atrelada 
+a 'sei.tipo_contato'. Para tanto, é importante ressaltar que para evitar erros durante 
+a execução do ETL, o usuário configurado deverá possuir permissões para execução de 
+operações 'IDENTITY_INSERT' ou então, estar dentro de um grupo cujo possua tais atributos.
+
+
+stp. Table input:
+
+Este step vai coletar o valor de id_tipo_contato referente ao último registro presente
+na tabela 'sei.tipo_contato', um valor recém-inserido pelo processo de carga ETL.
+
+
+stp. Table output:
+
+Este step irá inserir os valores condizentes na tabela 'sei.seq_tipo_contato'; 
+vale ressaltar que nas opções do step, o mesmo é configurado para executar 
+'SET IDENTITY_INSERT BANCO.dbo.seq_tipo_contato ON'. Sem esta operação, por padrão
+o SQL Server retornaria um erro pois, a feature de IDENTITY_INSERT estaria desligada.
+
+
+stp. Execute SQL script 2:
+
+Este step é responsável por inserir os valores pertinentes na tabela de sequência, contando
+com o recurso de substituição de variáveis.
+
+
+
+1.3.5. ktr. 'cria infra_parametro'
+
+Esta transformação possui como objetivo crar um novo registro em 'sei.infra_parametro' condizente
+com o escopo da carga ETL. Este passo é muito importante pois se tal registro não for criado,
+problemas de integridade podem aparecer no banco de dados e na aplicação como um todo pois a tabela
+em questão possui inúmeros relacionamentos dentro da estrutura do banco que não podem ser afetados 
+pela carga. A mesma deve se comportar com a maior fidelidade em relação ao comportamento original
+da aplicação.
+
+
+stp. Table input:
+
+Este step funciona de forma similar ao step presente em '1.3.3. ktr. 'cria tipo_contato''; uma 
+estrutura de filtro por 'timestamp' foi implementado visando garantir a integridade dos dados colhidos
+que posteriormente serão redirecionados, neste caso, para um step 'Execute SQL script'. Só que aqui,
+o padrão resultante é 'ORGAO_CARGA_ID_TIPO_CONTATO_UNIDADES'.
+
+
+stp. Table input 2:
+
+Este step irá coletar o valor de 'id_tipo_contato' referente ao último registro inserido em
+'sei.tipo_contato'; este valor posteriormente irá ser utilizado na substituição de variáveis
+no step 'Execute SQL script' a seguir.
+
+
+stp. Join Rows (cartesian product):
+
+O papel do step join rows neste contexto é de simplesmente 'juntar' os resultados dos inputs 
+anteriores, para que posteriomente tais valores possam ser utilizados dentro da estrutura do 
+'Execute SQL script' no recurso de 'variable substitution' ou substituição de variáveis. 
+
+
+stp. Execute SQL Script:
+
+Este step é responsável por inserir os valores pertinentes na tabela 'sei.infra_parametro', contando
+com o recurso de substituição de variáveis.
+
+
+1.3.6. ktr. 'insere_unidades_raiz_contato':
+
+
+stp. Microsoft Excel Input:
+
+Este step irá receber os dados da planilha de atribuição de parentesco 
+'tabela_atribuicao_parentesco_hierarquia_orgao_raiz.xlsx'. Tal planilha faz a associação entre as
+unidades e será utilizada para a extração de valores de 'id_unidade' que serão utilizados para construir
+a estrutura de hierarquia dentro de 'sip.rel_hierarquia_unidade'.
+
+
+stp. Filter rows: 
+
+Este step dentro do escopo da transformação possui como função, filtrar o fluxo de dados oriundo da 
+planilha configurada no step anterior; tal fluxo filtrado será utilizado dentro do próximo step, 
+'Stream lookup'.
+
+stp. Table input: 
+
+Este step também realiza a filtragem de valores presentes em 'sip.rel_hierarquia_unidade' através da
+coluna 'dta_inicio', processo semelhante ao visto em anteriormente em '1.3.3. ktr. 'cria tipo_contato'.
+
+stp. Stream lookup:
+
+No escopo da carga, este step executa um filtro coletando a entrada anterior; os campos 'sigla' e 'sigla_uni'
+são observados durante a execução e quando encontrados, os valores presentes na seção 'Specify the Fields to
+retrieve' são recuperados e redirecionados no fluxo.
+
+
+stp. Table input 2: 
+
+Este step possui como função coletar os valores de id_tipo_contato de 'sei.tipo_contato' para que os mesmos
+sejam posteriormente inseridos no último step, 'Execute SQL script'.
+
+
+stp. Join Rows (cartesian product):
+
+O papel do step join rows neste contexto é de simplesmente 'juntar' os resultados dos inputs 
+anteriores, para que posteriomente tais valores possam ser utilizados dentro da estrutura do 
+'Execute SQL script' no recurso de 'variable substitution' ou substituição de variáveis. 
+
+
+stp. Database join:
+
+Este step por sua vez, irá cuidar do fluxo de recuperação de valores de sequência e inserção simultânea;
+antes de qualquer coisa, a feature de 'IDENTITY_INSERT' deverá ser ativada para a tabela de sequência pois
+a mesmo por padrão sempre estará desativado. Em seguida, o valor recuperado é inserido na tabela de sequência
+até que a quantidade total de valores recuperados e filtrados nos steps anteriores seja igual a 0.
+O valor correspondente a 'id' será utilizado para alimentar o valor de 'id_contato', quando por fim os registros
+de contato forem inseridos via step 'Execute SQL script'.
+
+stp. Database join 2:
+
+Este step coleta o valor de 'id_contato_associado' da tabela contato onde o valor de 'sigla' for igual 
+aos parâmetros especificados na seção 'parameters to use'; neste caso, ele irá coletar o valor de 'id_contato'
+da sigla do órgão no qual está sendo carregado.
+
+stp. Add constants:
+
+Este step possui como função fazer a equivalência de valores constantes dentro do escopo da carga; tais valores
+foram observados durante o processo de engenharia reversa do banco e foram assumidos como ideais, tendo-se em vista 
+o comportamento da aplicação durante as inserções. Os valores constantes estão explicitados em 'Fields' (Name);
+os valores especificados estão presentes na coluna 'Value'.
+
+
+stp. Execute SQL script:
+
+Por fim, este step irá consolidar todos os dados em uma query de insert e utilizar o recurso de 
+substituição de variáveis para de fato inserir na tabela 'sei.contato' de forma análoga à aplicação.
+
+
+1.3.7. ktr. 'insere_sub_unidades_contato':
+
+Esta transformação possui a mesma estrutura de '1.3.6. ktr. 'insere_unidades_raiz_contato''.
+
+
+1.3.8. ktr. 'desliga_idnt_insert_seq_contato':
+
+Resumidamente, esta transformação dentro do escopo do job, possui como função vital, desligar 
+o 'IDENTITY_INSERT' da tabela de sequência 'sei.seq_contato', visando recuperar o seu estado 
+original, evitando assim problemas na estrutura do banco. A transformação possui apenas um 
+step 'Execute SQL script' que por sua vez executa a instrução necessária para o desligamento
+da feature.
+
+
+1.3.9. ktr. 'insere_unidades_raiz_sei':
+
+Esta transformação coleta os dados previamente inseridos em 'sip.rel_hierarquia_unidade' utilizando 
+também o recurso de 'timestamp' como filtro de registros. Os dados são consolidados e redirecionados
+para a tabela 'sei.unidade', respeitando o fluxo padrão da aplicação.
+
+
+stp. Table input:
+
+Este step coleta os dados previamente inseridos em 'sip.rel_hierarquia_unidade' utilizando 
+também o recurso de 'timestamp' como filtro de registros e redireciona para que o próximo step,
+'Database join' possa encontrar os demais valores necessários para a inserção no final do fluxo.
+
+
+stp. Database input: 
+
+Este step utiliza como argumento de consulta o parâmetro pré-configurado em 'The parameters to use';
+uma vez substituída, a variável irá permitir o filtro na consulta de acordo com os valores recuperados 
+no primeiro step da transformação.
+
+
+stp. Execute SQL script:
+
+Por fim, este step irá inserir os valores no banco, utilizando o recurso de substituição de variáveis
+presente na seção 'Parameters'.
+
+
+1.3.9. ktr. 'insere_sub_unidades_sei': 
+
+Esta transformação possui a mesma estrutura de '1.3.9. ktr. 'insere_unidades_raiz_sei''.
+
+
+
+1.3.10. ktr. 'insere_email_unidades_raiz':
+
+Esta transformação possui como objetivo carregar os e-mails pertencentes às unidades que estão sendo
+carregadas. Possui função análoga à 'carga de contatos SEI via add-on iMacros para firefox'.
+
+
+stp. Microsoft Excel Input: 
+
+Este step coleta os e-mails das unidades raiz, utilizando a mesma planilha de atribuição de parentesco
+implementada nas transformações anteriores deste job. A planilha foi projetada para conter todos os
+dados necessários para carregar os dados de unidades raiz.
+
+
+stp. Database join: 
+
+Este step por sua vez, irá cuidar do fluxo de recuperação de valores de sequência e inserção simultânea;
+antes de qualquer coisa, a feature de 'IDENTITY_INSERT' deverá ser ativada para a tabela de sequência pois
+a mesmo por padrão sempre estará desativado. Em seguida, o valor recuperado é inserido na tabela de sequência
+até que a quantidade total de valores recuperados e filtrados nos steps anteriores seja igual a 0.
+O valor correspondente a 'id' será utilizado para alimentar o valor de 'id_email_unidade', quando por fim os 
+registros de e-mail forem inseridos via step 'Execute SQL script'.
+
+stp. Database join 2: 
+
+Este step possui como função dentro do escopo da transformação, recuperar os valores de sigla, através do 
+recurso de substituição de variáveis presente na seção 'The parameters to use'.
+
+
+stp. Execute SQL script:
+
+Por fim, o step 'Execute SQL script' irá fazer a inserção dos valores utilizando o recurso de substituição 
+de variáveis.
+
+
+1.3.11. ktr. 'insere_email_sub_unidades': 
+
+Esta transformação possui a mesma estrutura de '1.3.10. ktr. 'insere_email_unidades_raiz''.
+
+
+
+
+
+
+
+
+
+
